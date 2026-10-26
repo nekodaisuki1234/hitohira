@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {fresh,lifeDay,candidates,draw,complete,remaining,choose} from './core.js';
+const date=(day,h,m=0)=>new Date(2026,9,day,h,m).getTime();
+test('生活日は4時に切り替わり、夏時間にも依存しない日付操作',()=>{assert.equal(lifeDay(date(27,3,59)),lifeDay(date(26,23)));assert.notEqual(lifeDay(date(27,4)),lifeDay(date(26,23)));});
+test('外出中、対象時間外、深夜の長い活動を除外',()=>{let s=fresh();s.place='out';assert.ok(candidates(s,date(26,20)).every(c=>c.place==='any'));assert.ok(!candidates(s,date(26,10)).some(c=>c.id==='bath'));assert.ok(candidates(s,date(26,23)).every(c=>c.late));assert.ok(!candidates(s,date(27,1)).some(c=>['study','desk'].includes(c.id)));});
+test('完了した夜の習慣は日付をまたいでも再登場しない',()=>{let s=fresh();s.cards=s.cards.filter(c=>c.id==='teeth');draw(s,date(26,23));complete(s,date(27,0));s.last=null;assert.equal(candidates(s,date(27,2)).length,0);assert.equal(candidates(s,date(27,20)).length,1);});
+test('スキップ・完了後の直後の重複を防ぐ',()=>{let s=fresh();const a=draw(s,date(26,20));s.last=a.card.id;s.active=null;assert.ok(candidates(s,date(26,20)).every(c=>c.id!==a.card.id));draw(s,date(26,20));const id=s.active.card.id;complete(s,date(26,20));assert.ok(candidates(s,date(26,20)).every(c=>c.id!==id));});
+test('2回楽しみが続いたら候補の習慣を必ず優先',()=>{const s=fresh();s.sinceHabit=2;assert.equal(choose(s,date(26,20),()=>.999).habit,true);});
+test('保存復元、終了予定からの残り時間、時間切れで未完了を維持',()=>{const s=fresh();draw(s,date(26,20));const restored=JSON.parse(JSON.stringify(s));assert.deepEqual(restored,s);assert.equal(remaining(restored.active,restored.active.end-1500),2);assert.equal(remaining(restored.active,restored.active.end+60000),0);assert.ok(restored.active);assert.equal(restored.history.length,0);});
+test('疲れた時は短いカードの重みが高い',()=>{const s=fresh();s.energy='tired';s.cards=s.cards.filter(c=>['music','breathe'].includes(c.id));let short=0;for(let i=0;i<100;i++){if(choose(s,date(26,20),()=>i/100).id==='breathe')short++;}assert.ok(short>70);});
